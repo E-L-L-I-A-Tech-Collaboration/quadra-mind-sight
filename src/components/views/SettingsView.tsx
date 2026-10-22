@@ -193,6 +193,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onDataReset, onOpenG
           You can download a full backup at any time.
         </p>
 
+        <p className="text-xs font-light font-sans leading-relaxed">
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#9db4ff] underline underline-offset-2 hover:text-white transition-colors"
+          >
+            Privacy Policy
+          </a>
+          <span className="text-white/50"> — how the app handles your data, in full.</span>
+        </p>
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleExport}
