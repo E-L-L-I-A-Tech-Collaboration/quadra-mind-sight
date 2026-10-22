@@ -5,6 +5,8 @@ import { AndroidBottomNav } from './components/AndroidBottomNav';
 import { AudioBar } from './components/AudioBar';
 import { GroundingModal } from './components/GroundingModal';
 import { MobileMenuDrawer } from './components/MobileMenuDrawer';
+import PaywallModal from './components/PaywallModal';
+import { useSubscription } from './billing/useSubscription';
 import { audioEngine } from './audio/AudioEngine';
 import { storageService } from './services/storage';
 import { QUADRA_EXERCISES } from './data/exercisesData';
@@ -76,6 +78,13 @@ export default function App() {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState('');
+
+  // Google Play subscription (Digital Goods API). HARD GATE inside the
+  // Android app: the whole app requires an active subscription
+  // (a 7-day free trial counts as active — Play reports it as a
+  // purchase). On the open web the Digital Goods API does not exist,
+  // status stays 'unavailable', and the app runs ungated.
+  const sub = useSubscription();
 
   // Subscribe to Audio Engine state
   useEffect(() => {
@@ -189,6 +198,37 @@ export default function App() {
 
   const activeExercise =
     QUADRA_EXERCISES.find((ex) => ex.id === selectedExerciseId) || QUADRA_EXERCISES[0];
+
+  // Hard gate (Android app only): render no app UI until the
+  // subscription check resolves, and none at all while there is no
+  // active subscription. 'premium' and 'unavailable' (open web) fall
+  // through to the full app below.
+  if (sub.status === 'loading') {
+    return (
+      <div className="h-[100dvh] w-full bg-[#050508] flex flex-col items-center justify-center gap-4">
+        <div
+          className="w-8 h-8 rounded-full border-2 border-[#D4AF37]/20 border-t-[#D4AF37] animate-spin"
+          role="status"
+          aria-label="Checking subscription"
+        />
+        <p className="text-xs font-mono uppercase tracking-[0.2em] text-white/50">
+          Checking subscription…
+        </p>
+      </div>
+    );
+  }
+  if (sub.status === 'free') {
+    return (
+      <div className="h-[100dvh] w-full bg-[#050508]">
+        <PaywallModal
+          isOpen
+          blocking
+          onClose={() => {}}
+          sub={sub}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

@@ -13,8 +13,8 @@
   "startUrl": "/",
   "iconUrl": "https://quadra-mind-sight.onrender.com/pwa-512x512.png",
   "maskableIconUrl": "https://quadra-mind-sight.onrender.com/pwa-maskable-512x512.png",
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
+  "appVersionName": "1.1.0",
+  "appVersionCode": 3,
   "shortcuts": [
     {
       "name": "Quick Practice",
@@ -36,11 +36,11 @@
       "enabled": false
     },
     "playBilling": {
-      "enabled": false
+      "enabled": true
     }
   },
   "alphaDependencies": {
-    "enabled": false
+    "enabled": true
   },
   "display": "standalone",
   "orientation": "portrait",

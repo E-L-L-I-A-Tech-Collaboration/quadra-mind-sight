@@ -428,7 +428,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="mt-6 pt-4 border-t border-white/10 text-center">
             <p className="text-[10.5px] font-mono text-white/40">
-              Complete standalone access • No paywall or external billing
+              Full access with subscription • 7-day free trial in the Android app
             </p>
           </div>
         </div>
