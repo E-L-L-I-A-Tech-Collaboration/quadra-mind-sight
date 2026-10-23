@@ -3,11 +3,17 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { cloudStore } from './server/cloudStore';
+import { billingStatus, createCheckoutSession, handleWebhook } from './server/billing';
 
 dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+
+// Stripe webhook requires the RAW request body for signature verification.
+// Registered before the JSON parser: body-parser skips re-parsing once
+// req._body is set, so the raw Buffer survives intact to the handler.
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json());
 
@@ -156,6 +162,16 @@ app.get('/api/auth/tiers', (_req, res) => {
     ],
   });
 });
+
+// ==========================================
+// Step C: Stripe Subscription Billing (open web)
+// ==========================================
+// M.I.N.D. Sight Premium — $14.99/month. Checkout creates the subscription;
+// the webhook upgrades accountTier to 'premium' (downgrades to
+// 'practitioner' on cancel). Never touches the free 'Seeker' tier.
+app.post('/api/billing/checkout', createCheckoutSession);
+app.post('/api/billing/webhook', handleWebhook);
+app.get('/api/billing/status', billingStatus);
 
 // Lazy-initialize Gemini client to prevent crashes if key is not configured
 let aiClient: GoogleGenAI | null = null;
