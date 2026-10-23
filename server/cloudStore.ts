@@ -7,6 +7,7 @@ export interface UserProfileRecord {
   email: string;
   curriculumWave: number;
   accountTier: 'free' | 'practitioner' | 'premium';
+  stripeCustomerId?: string;
   joinedDate: string;
   updatedAt: string;
   avatarSymbol?: string;
@@ -112,6 +113,15 @@ class CloudDatabase {
     return null;
   }
 
+  public getProfileByStripeCustomerId(customerId: string): UserProfileRecord | null {
+    for (const data of Object.values(this.db)) {
+      if (data.profile.stripeCustomerId === customerId) {
+        return data.profile;
+      }
+    }
+    return null;
+  }
+
   public upsertProfile(
     profileInput: Partial<UserProfileRecord> & { uid: string; email?: string }
   ): UserProfileRecord {
@@ -127,6 +137,7 @@ class CloudDatabase {
       email,
       curriculumWave,
       accountTier,
+      stripeCustomerId: profileInput.stripeCustomerId || existing?.profile?.stripeCustomerId,
       joinedDate: existing?.profile?.joinedDate || new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
       updatedAt: new Date().toISOString(),
       avatarSymbol: profileInput.avatarSymbol || existing?.profile?.avatarSymbol || 'orb',
