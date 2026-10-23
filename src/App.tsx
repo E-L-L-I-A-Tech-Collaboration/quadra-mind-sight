@@ -6,7 +6,9 @@ import { AudioBar } from './components/AudioBar';
 import { GroundingModal } from './components/GroundingModal';
 import { MobileMenuDrawer } from './components/MobileMenuDrawer';
 import PaywallModal from './components/PaywallModal';
+import StripePaywallModal from './components/StripePaywallModal';
 import { useSubscription } from './billing/useSubscription';
+import { useWebSubscription } from './billing/useWebSubscription';
 import { audioEngine } from './audio/AudioEngine';
 import { storageService } from './services/storage';
 import { QUADRA_EXERCISES } from './data/exercisesData';
@@ -86,6 +88,65 @@ export default function App() {
   // status stays 'unavailable', and the app runs ungated.
   const sub = useSubscription();
 
+  // Stripe subscription (open web). Gates Waves 5-8 behind M.I.N.D. Sight
+  // Premium ($14.99/month). Independent of the Google Play flow above, which
+  // only exists inside the Android TWA.
+  const webSub = useWebSubscription(
+    profile.uid,
+    profile.accountTier === 'free' || profile.accountTier === 'premium'
+      ? profile.accountTier
+      : 'practitioner',
+  );
+  const [stripePaywallOpen, setStripePaywallOpen] = useState(false);
+  const [billingNotice, setBillingNotice] = useState<string | null>(null);
+  const webSubRefreshRef = React.useRef(webSub.refresh);
+  webSubRefreshRef.current = webSub.refresh;
+
+  // Stripe redirect-back: ?billing=success | ?billing=cancelled
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get('billing');
+    if (billing !== 'success' && billing !== 'cancelled') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    if (billing === 'cancelled') {
+      setBillingNotice('Checkout was cancelled — no charge was made.');
+      return;
+    }
+    setBillingNotice('Welcome to M.I.N.D. Sight Premium — your subscription is activating.');
+    // The webhook usually lands within seconds; poll so the tier flips
+    // without requiring a manual refresh.
+    const refresh = webSubRefreshRef.current;
+    void refresh();
+    const t1 = window.setTimeout(() => void refresh(), 4000);
+    const t2 = window.setTimeout(() => void refresh(), 12000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mirror a server-side premium grant into the local profile so the whole
+  // UI (wave picker, profile view) reflects the entitlement.
+  useEffect(() => {
+    if (webSub.status === 'ready' && webSub.premium && profile.accountTier !== 'premium') {
+      const updated = storageService.saveProfile({ ...profile, accountTier: 'premium' });
+      setProfile(updated);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webSub.status, webSub.premium]);
+
+  // Enforce the tier matrix: Waves 5-8 are Premium-only. If a non-premium
+  // account somehow has a higher wave selected, clamp back to Wave 4.
+  useEffect(() => {
+    if (webSub.status === 'ready' && !webSub.premium && progress.currentWave > 4) {
+      const updated = storageService.updateCurrentWave(4);
+      setProgress(updated);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webSub.status, webSub.premium]);
+
   // Subscribe to Audio Engine state
   useEffect(() => {
     const unsub = audioEngine.subscribe((cfg) => {
@@ -111,6 +172,12 @@ export default function App() {
     CURRICULUM_WAVES.find((w) => w.wave === progress.currentWave) || CURRICULUM_WAVES[0];
 
   const handleSelectWave = (waveNumber: number) => {
+    // Waves 5-8 are Premium-only on the web: show the Stripe paywall
+    // instead of switching. Free and practitioner tiers keep Waves 1-4.
+    if (waveNumber > 4 && !webSub.premium) {
+      setStripePaywallOpen(true);
+      return;
+    }
     const updated = storageService.updateCurrentWave(waveNumber);
     setProgress(updated);
   };
@@ -403,6 +470,33 @@ export default function App() {
         onOpenGroundModal={() => setIsGroundModalOpen(true)}
         profile={profile}
       />
+
+      {/* Stripe paywall (open web): Waves 5-8 / Premium upsell */}
+      <StripePaywallModal
+        isOpen={stripePaywallOpen}
+        onClose={() => setStripePaywallOpen(false)}
+        initialEmail={profile.email || ''}
+        subscribing={webSub.subscribing}
+        error={webSub.error}
+        billingConfigured={webSub.billingConfigured}
+        onSubscribe={(email) => void webSub.subscribe(email)}
+      />
+
+      {/* Post-checkout notice banner */}
+      {billingNotice && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)]">
+          <div className="flex items-center gap-3 bg-[#0A0D18] border border-[#D4AF37]/50 px-4 py-3 shadow-[0_0_30px_rgba(212,175,55,0.15)]">
+            <p className="flex-1 text-xs text-white/85">{billingNotice}</p>
+            <button
+              type="button"
+              onClick={() => setBillingNotice(null)}
+              className="text-white/60 hover:text-white text-xs font-mono uppercase tracking-[0.2em] cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Safety Re-Orientation Grounding Modal */}
       <GroundingModal
